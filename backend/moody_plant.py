@@ -1,5 +1,10 @@
 import cv2
 from deepface import DeepFace
+from fastapi import FastAPI, Response
+from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
+import base64
+import io
 import pygame
 import sys
 import os
@@ -127,6 +132,30 @@ def draw_plant(emotion):
     else:
         shake_intensity = 0
 
+app = FastAPI()
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/emotion")
+async def get_emotion():
+    emotion = detect_emotion()
+    # Convert pygame surface to base64 image
+    pygame.image.save(screen, "temp_screen.png")
+    with open("temp_screen.png", "rb") as image_file:
+        encoded_image = base64.b64encode(image_file.read()).decode()
+    
+    return {
+        "emotion": emotion,
+        "plant_image": encoded_image
+    }
+
 # Main loop
 def main():
     running = True
@@ -150,4 +179,4 @@ def main():
     sys.exit()
 
 if __name__ == "__main__":
-    main()
+    uvicorn.run(app, host="0.0.0.0", port=8000)
