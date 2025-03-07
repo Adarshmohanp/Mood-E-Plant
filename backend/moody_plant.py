@@ -19,7 +19,6 @@ import time
 
 # Define assets path
 ASSETS_PATH = os.path.join(os.path.dirname(__file__), "assets")
-
 # Initialize Pygame
 pygame.init()
 
