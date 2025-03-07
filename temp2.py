@@ -1,9 +1,28 @@
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress TensorFlow logging
+
 import cv2
 import tkinter as tk
 from PIL import Image, ImageTk
 import numpy as np
 import tensorflow as tf
-from pygame import mixer  # For sound effects
+import sys
+from contextlib import contextmanager
+
+# Suppress Pygame welcome message
+@contextmanager
+def suppress_stdout():
+    with open(os.devnull, 'w') as devnull:
+        old_stdout = sys.stdout
+        sys.stdout = devnull
+        try:
+            yield
+        finally:
+            sys.stdout = old_stdout
+
+with suppress_stdout():
+    from pygame import mixer  # For sound effects
+    mixer.init()
 
 # Load the emotion recognition model
 model = tf.keras.models.load_model('facemodel.keras')
@@ -14,17 +33,10 @@ plant_images = {
     'Happy': Image.open('happy_plant.png'),
     'Neutral': Image.open('neutral_plant.png'),
     'Sad': Image.open('sad_plant.png'),
-    'Angry': Image.open('angry_plant.png')
+    'Angry': Image.open('angry_plant.png'),
+    'Fear': Image.open('fear_plant.png'),  # Add a plant image for Fear
+    'Surprise': Image.open('surprise_plant.png')  # Add a plant image for Surprise
 }
-
-# Load sound effects
-'''mixer.init()
-sound_effects = {
-    'Happy': 'happy_sound.wav',
-    'Sad': 'sad_sound.wav',
-    'Angry': 'angry_sound.wav',
-    'Neutral': 'neutral_sound.wav'
-}'''
 
 # Face detection model
 faceclass = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
@@ -35,16 +47,11 @@ running = False
 def update_plant(emotion):
     plant_image = plant_images.get(emotion)
     if plant_image:
-        # Resize the plant image
-        plant_image = plant_image.resize((300, 300), Image.Resampling.LANCZOS)
+        # Resize the plant image to fit the window
+        plant_image = plant_image.resize((400, 400), Image.Resampling.LANCZOS)
         plant_photo = ImageTk.PhotoImage(plant_image)
         plant_label.config(image=plant_photo)
         plant_label.image = plant_photo
-
-        # Play sound effect for the detected emotion
-        '''if emotion in sound_effects:
-            mixer.music.load(sound_effects[emotion])
-            mixer.music.play()'''
 
         # Start animation based on emotion
         if emotion == 'Happy':
@@ -53,6 +60,10 @@ def update_plant(emotion):
             animate_droop(plant_image)
         elif emotion == 'Angry':
             animate_shake(plant_image)
+        elif emotion == 'Fear':
+            animate_fear(plant_image)  # Animation for Fear
+        elif emotion == 'Surprise':
+            animate_surprise(plant_image)  # Animation for Surprise
         elif emotion == 'Neutral':
             # No animation for neutral
             pass
@@ -88,6 +99,99 @@ def animate_shake(plant_image):
             root.update()  # Update the GUI
             root.after(50)  # Delay for fast shaking
 
+# Function to animate fear (for fear emotion)
+def animate_fear(plant_image):
+    def shrink(scale):
+        if not running:  # Stop animation if webcam is stopped
+            return
+        # Resize the plant image
+        new_size = (int(400 * scale), int(400 * scale))
+        resized_image = plant_image.resize(new_size, Image.Resampling.LANCZOS)
+        plant_photo = ImageTk.PhotoImage(resized_image)
+        plant_label.config(image=plant_photo)
+        plant_label.image = plant_photo
+        # Schedule the next frame
+        if scale > 0.8:  # Shrink to 80% of the original size
+            root.after(100, shrink, scale - 0.05)
+        else:
+            root.after(100, grow, scale + 0.05)
+
+    def grow(scale):
+        if not running:  # Stop animation if webcam is stopped
+            return
+        # Resize the plant image
+        new_size = (int(400 * scale), int(400 * scale))
+        resized_image = plant_image.resize(new_size, Image.Resampling.LANCZOS)
+        plant_photo = ImageTk.PhotoImage(resized_image)
+        plant_label.config(image=plant_photo)
+        plant_label.image = plant_photo
+        # Schedule the next frame
+        if scale < 1.0:  # Grow back to the original size
+            root.after(100, grow, scale + 0.05)
+        else:
+            root.after(100, tremble, 0)
+
+    def tremble(count):
+        if not running:  # Stop animation if webcam is stopped
+            return
+        # Slightly shake the plant
+        angle = 5 if count % 2 == 0 else -5
+        rotated_image = plant_image.rotate(angle, expand=True)
+        plant_photo = ImageTk.PhotoImage(rotated_image)
+        plant_label.config(image=plant_photo)
+        plant_label.image = plant_photo
+        # Schedule the next frame
+        if count < 10:  # Tremble 10 times
+            root.after(50, tremble, count + 1)
+
+    shrink(1.0)  # Start the shrink animation
+
+# Function to animate surprise (for surprise emotion)
+def animate_surprise(plant_image):
+    def jump(offset):
+        if not running:  # Stop animation if webcam is stopped
+            return
+        # Move the plant up and down
+        plant_label.place(y=50 + offset)  # Adjust the Y position
+        # Schedule the next frame
+        if offset > -20:  # Move up
+            root.after(50, jump, offset - 10)
+        elif offset < 20:  # Move down
+            root.after(50, jump, offset + 10)
+        else:
+            plant_label.place(y=50)  # Reset position
+            root.after(50, expand, 1.0)
+
+    def expand(scale):
+        if not running:  # Stop animation if webcam is stopped
+            return
+        # Resize the plant image
+        new_size = (int(400 * scale), int(400 * scale))
+        resized_image = plant_image.resize(new_size, Image.Resampling.LANCZOS)
+        plant_photo = ImageTk.PhotoImage(resized_image)
+        plant_label.config(image=plant_photo)
+        plant_label.image = plant_photo
+        # Schedule the next frame
+        if scale < 1.2:  # Expand to 120% of the original size
+            root.after(50, expand, scale + 0.05)
+        else:
+            root.after(50, shrink_back, scale - 0.05)
+
+    def shrink_back(scale):
+        if not running:  # Stop animation if webcam is stopped
+            return
+        # Resize the plant image
+        new_size = (int(400 * scale), int(400 * scale))
+        resized_image = plant_image.resize(new_size, Image.Resampling.LANCZOS)
+        plant_photo = ImageTk.PhotoImage(resized_image)
+        plant_label.config(image=plant_photo)
+        plant_label.image = plant_photo
+        # Schedule the next frame
+        if scale > 1.0:  # Shrink back to the original size
+            root.after(50, shrink_back, scale - 0.05)
+
+    jump(0)  # Start the jump animation
+
 # Function to detect faces and predict emotions
 def detectbox(vid):
     grayimage = cv2.cvtColor(vid, cv2.COLOR_BGR2GRAY)
@@ -104,7 +208,6 @@ def detectbox(vid):
             face = np.expand_dims(face, axis=0)
             prediction = model.predict(face)
             emotion = emotion_labels[np.argmax(prediction)]
-            cv2.putText(vid, emotion, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36, 255, 12), 2)
             update_plant(emotion)  # Update the plant based on emotion
     return vid
 
@@ -114,18 +217,10 @@ def start_webcam():
     if not running:
         running = True
         cam = cv2.VideoCapture(0)
+        btn_start.pack_forget()  # Remove the Start button from the GUI
         show_frame()
 
-# Function to stop webcam
-def stop_webcam():
-    global cam, running
-    running = False
-    if cam is not None:
-        cam.release()
-        cam = None
-    webcam_label.config(image='')
-
-# Function to continuously update video feed
+# Function to continuously update video feed (without displaying it)
 def show_frame():
     global cam, running
     if running and cam is not None:
@@ -133,41 +228,39 @@ def show_frame():
         if ret:
             frame = cv2.flip(frame, 1)
             frame = detectbox(frame)  # Detect emotions and update plant
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            frame = cv2.resize(frame, (800, 450))
-            img = Image.fromarray(frame)
-            imgtk = ImageTk.PhotoImage(image=img)
-            webcam_label.imgtk = imgtk
-            webcam_label.configure(image=imgtk)
         if running:
             root.after(10, show_frame)  # Asynchronous update
 
+# Function to handle application closing
+def on_closing():
+    global cam, running
+    running = False
+    if cam is not None:
+        cam.release()
+    root.destroy()
+
 # Main Tkinter window
 root = tk.Tk()
-root.title("Moody Plant Lite - Happy Test")
-root.geometry("800x600")
+root.title("Moody Plant Lite")
+root.geometry("600x700")  # Larger window for better visual appeal
 root.configure(bg="#1e1e1e")
 
 # Plant display
 plant_label = tk.Label(root, bg="#1e1e1e")
-plant_label.pack(pady=20)
-
-# Webcam feed
-webcam_label = tk.Label(root, bg="#1e1e1e")
-webcam_label.pack()
+plant_label.pack(pady=50)  # Add more padding for better spacing
 
 # Buttons
 btn_frame = tk.Frame(root, bg="#1e1e1e")
-btn_frame.pack(pady=10)
+btn_frame.pack(pady=20)
 
 btn_style1 = {"font": ("Arial", 14, "bold"), "fg": "white", "bg": "lawngreen", "width": 20, "bd": 0, "relief": "flat"}
-btn_style2 = {"font": ("Arial", 14, "bold"), "fg": "white", "bg": "red", "width": 20, "bd": 0, "relief": "flat"}
 
+# Start button
 btn_start = tk.Button(btn_frame, text="Start Webcam", command=start_webcam, **btn_style1)
 btn_start.pack(side=tk.LEFT, padx=10, pady=5)
 
-btn_stop = tk.Button(btn_frame, text="Stop Webcam", command=stop_webcam, **btn_style2)
-btn_stop.pack(side=tk.RIGHT, padx=10, pady=5)
+# Handle window closing event
+root.protocol("WM_DELETE_WINDOW", on_closing)
 
 # Start the app
 root.mainloop()
