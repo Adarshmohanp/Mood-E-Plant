@@ -116,7 +116,7 @@ def show_frame():
             webcam_label.imgtk = imgtk
             webcam_label.configure(image=imgtk)
         if running:
-            root.after(10, show_frame)  # Asynchronous update
+            root.after(900, show_frame)  # Asynchronous update
 
 # Main Tkinter window
 root = tk.Tk()
