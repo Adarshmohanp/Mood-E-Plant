@@ -1,153 +1,133 @@
 import cv2
-from deepface import DeepFace
-import pygame
-import sys
-import os
-import random
-import time
+import tkinter as tk
+from PIL import Image, ImageTk
+import numpy as np
+import tensorflow as tf
+from pygame import mixer  # For sound effects
 
-# Initialize Pygame
-pygame.init()
+# Load the emotion recognition model
+model = tf.keras.models.load_model('facemodel.keras')
+emotion_labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Neutral', 'Sad', 'Surprise']
 
-# Set up the screen
-screen_width = 800
-screen_height = 600
-screen = pygame.display.set_mode((screen_width, screen_height))
-pygame.display.set_caption("Moody Plant")
+# Load plant images
+plant_images = {
+    'Happy': Image.open('happy_plant.png'),
+    'Neutral': Image.open('neutral_plant.png')  # Default image for non-happy emotions
+}
 
-# Load images
-pot_img = pygame.image.load(os.path.join("pot.png"))
-stem_img = pygame.image.load(os.path.join("stem.png"))
-leaves_img = pygame.image.load(os.path.join("leaves.png"))
-flower_img = pygame.image.load(os.path.join("flower.png"))
-petal_img = pygame.image.load(os.path.join("petal.png"))  # Add a petal image
-background_img = pygame.image.load(os.path.join("background.png"))
+# Load sound effects
+mixer.init()
+'''sound_effects = {
+    'Happy': 'happy_sound.wav'
+}
+'''
+# Face detection model
+faceclass = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+cam = None
+running = False
 
-# Resize images (if needed)
-pot_img = pygame.transform.scale(pot_img, (100, 100))
-stem_img = pygame.transform.scale(stem_img, (20, 200))
-leaves_img = pygame.transform.scale(leaves_img, (100, 100))
-flower_img = pygame.transform.scale(flower_img, (50, 50))
-petal_img = pygame.transform.scale(petal_img, (20, 20))  # Resize petal image
+# Function to update the plant image and sound
+def update_plant(emotion):
+    if emotion == 'Happy':  # Only update for happy emotion
+        plant_image = plant_images.get('Happy')
+        if plant_image:
+            plant_image = plant_image.resize((300, 300), Image.Resampling.LANCZOS)
+            plant_photo = ImageTk.PhotoImage(plant_image)
+            plant_label.config(image=plant_photo)
+            plant_label.image = plant_photo
 
-# Animation variables
-sway_angle = 0
-sway_direction = 1
-shake_intensity = 0
-falling_leaves = []
-falling_petals = []
-blooming_flowers = []
-
-# Function to detect emotion
-def detect_emotion():
-    cap = cv2.VideoCapture(0)
-    if not cap.isOpened():
-        print("Error: Could not open webcam.")
-        return None
-
-    ret, frame = cap.read()
-    if not ret:
-        print("Error: Could not read frame.")
-        return None
-
-    cv2.imwrite("temp.jpg", frame)
-    try:
-        result = DeepFace.analyze("temp.jpg", actions=["emotion"])
-        emotion = result[0]["dominant_emotion"]
-        print(f"Detected emotion: {emotion}")
-        return emotion
-    except Exception as e:
-        print(f"Error analyzing emotion: {e}")
-        return None
-    finally:
-        cap.release()
-
-# Function to draw the plant
-def draw_plant(emotion):
-    global sway_angle, sway_direction, shake_intensity, falling_leaves, falling_petals, blooming_flowers
-
-    # Draw background
-    screen.blit(background_img, (0, 0))
-
-    # Draw pot
-    screen.blit(pot_img, (350, 400))
-
-    # Sway the stem and leaves
-    sway_angle += 0.05 * sway_direction
-    if abs(sway_angle) > 5:
-        sway_direction *= -1
-
-    # Rotate stem and leaves
-    rotated_stem = pygame.transform.rotate(stem_img, sway_angle + shake_intensity * random.uniform(-1, 1))
-    rotated_leaves = pygame.transform.rotate(leaves_img, sway_angle + shake_intensity * random.uniform(-1, 1))
-
-    # Draw stem
-    screen.blit(rotated_stem, (390, 300))
-
-    # Draw leaves
-    screen.blit(rotated_leaves, (360, 280))
-
-    # Add flowers or effects based on emotion
-    if emotion == "happy":
-        # Bloom flowers
-        if len(blooming_flowers) < 5:
-            blooming_flowers.append((random.randint(350, 450), random.randint(200, 300)))
-        for flower in blooming_flowers:
-            screen.blit(flower_img, flower)
-    elif emotion == "sad":
-        # Falling leaves
-        if len(falling_leaves) < 10:
-            falling_leaves.append((random.randint(350, 450), random.randint(200, 300), random.uniform(-1, 1)))
-        for i, leaf in enumerate(falling_leaves):
-            x, y, speed = leaf
-            y += speed * 2
-            if y > screen_height:
-                falling_leaves.pop(i)
-            else:
-                screen.blit(leaves_img, (x, y))
-
-        # Falling petals
-        if len(falling_petals) < 15:
-            falling_petals.append((random.randint(350, 450), random.randint(200, 300), random.uniform(-1, 1)))
-        for i, petal in enumerate(falling_petals):
-            x, y, speed = petal
-            y += speed * 2
-            x += random.uniform(-1, 1)  # Add slight horizontal movement
-            if y > screen_height:
-                falling_petals.pop(i)
-            else:
-                screen.blit(petal_img, (x, y))
-    elif emotion == "angry":
-        # Shake the plant
-        shake_intensity = 5
-        # Add a red glow
-        glow = pygame.Surface((screen_width, screen_height), pygame.SRCALPHA)
-        pygame.draw.circle(glow, (255, 0, 0, 128), (400, 300), 100)
-        screen.blit(glow, (0, 0))
+            '''if emotion in sound_effects:
+                mixer.music.load(sound_effects[emotion])
+                mixer.music.play()'''
     else:
-        shake_intensity = 0
+        # Display default image for non-happy emotions
+        plant_image = plant_images.get('Neutral')
+        if plant_image:
+            plant_image = plant_image.resize((300, 300), Image.Resampling.LANCZOS)
+            plant_photo = ImageTk.PhotoImage(plant_image)
+            plant_label.config(image=plant_photo)
+            plant_label.image = plant_photo
 
-# Main loop
-def main():
-    running = True
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
+# Function to detect faces and predict emotions
+def detectbox(vid):
+    grayimage = cv2.cvtColor(vid, cv2.COLOR_BGR2GRAY)
+    faces = faceclass.detectMultiScale(grayimage, 1.1, 5, minSize=(40, 40))
+    for (x, y, w, h) in faces:
+        cv2.rectangle(vid, (x, y), (x + w, y + h), (0, 255, 0), 4)
+        face = grayimage[y:y+h, x:x+w]
+        if face.size > 0:  # Ensure the face region is valid
+            # Add padding to the face region
+            face = cv2.copyMakeBorder(face, 10, 10, 10, 10, cv2.BORDER_CONSTANT, value=[0, 0, 0])
+            face = cv2.resize(face, (48, 48))
+            face = face.astype('float32') / 255
+            face = tf.keras.preprocessing.image.img_to_array(face)
+            face = np.expand_dims(face, axis=0)
+            prediction = model.predict(face)
+            emotion = emotion_labels[np.argmax(prediction)]
+            cv2.putText(vid, emotion, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36, 255, 12), 2)
+            update_plant(emotion)  # Update the plant based on emotion
+    return vid
 
-        # Detect emotion
-        emotion = detect_emotion()
+# Function to start webcam
+def start_webcam():
+    global cam, running
+    if not running:
+        running = True
+        cam = cv2.VideoCapture(0)
+        show_frame()
 
-        # Update the screen
-        screen.fill((255, 255, 255))  # Fill screen with white
-        draw_plant(emotion)
-        pygame.display.flip()
+# Function to stop webcam
+def stop_webcam():
+    global cam, running
+    running = False
+    if cam is not None:
+        cam.release()
+        cam = None
+    webcam_label.config(image='')
 
-        # Add a small delay to reduce CPU usage
-        time.sleep(0.1)
+# Function to continuously update video feed
+def show_frame():
+    global cam, running
+    if running and cam is not None:
+        ret, frame = cam.read()
+        if ret:
+            frame = cv2.flip(frame, 1)
+            frame = detectbox(frame)  # Detect emotions and update plant
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            frame = cv2.resize(frame, (800, 450))
+            img = Image.fromarray(frame)
+            imgtk = ImageTk.PhotoImage(image=img)
+            webcam_label.imgtk = imgtk
+            webcam_label.configure(image=imgtk)
+        if running:
+            root.after(10, show_frame)  # Asynchronous update
 
-    pygame.quit()
-    sys.exit()
+# Main Tkinter window
+root = tk.Tk()
+root.title("Moody Plant Lite - Happy Test")
+root.geometry("800x600")
+root.configure(bg="#1e1e1e")
 
-if __name__ == "__main__":
-    main()
+# Plant display
+plant_label = tk.Label(root, bg="#1e1e1e")
+plant_label.pack(pady=20)
+
+# Webcam feed
+webcam_label = tk.Label(root, bg="#1e1e1e")
+webcam_label.pack()
+
+# Buttons
+btn_frame = tk.Frame(root, bg="#1e1e1e")
+btn_frame.pack(pady=10)
+
+btn_style1 = {"font": ("Arial", 14, "bold"), "fg": "white", "bg": "lawngreen", "width": 20, "bd": 0, "relief": "flat"}
+btn_style2 = {"font": ("Arial", 14, "bold"), "fg": "white", "bg": "red", "width": 20, "bd": 0, "relief": "flat"}
+
+btn_start = tk.Button(btn_frame, text="Start Webcam", command=start_webcam, **btn_style1)
+btn_start.pack(side=tk.LEFT, padx=10, pady=5)
+
+btn_stop = tk.Button(btn_frame, text="Stop Webcam", command=stop_webcam, **btn_style2)
+btn_stop.pack(side=tk.RIGHT, padx=10, pady=5)
+
+# Start the app
+root.mainloop()
