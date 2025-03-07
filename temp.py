@@ -12,7 +12,9 @@ emotion_labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Neutral', 'Sad', 'Surpri
 # Load plant images
 plant_images = {
     'Happy': Image.open('happy_plant.png'),
-    'Neutral': Image.open('neutral_plant.png')  # Default image for non-happy emotions
+    'Neutral': Image.open('neutral_plant.png'),
+    'Sad': Image.open('sad_plant.png'),
+    'Angry': Image.open('angry_plant.png')
 }
 
 # Load sound effects
@@ -39,8 +41,22 @@ def update_plant(emotion):
             '''if emotion in sound_effects:
                 mixer.music.load(sound_effects[emotion])
                 mixer.music.play()'''
-    else:
+    elif emotion == 'Sad':
         # Display default image for non-happy emotions
+        plant_image = plant_images.get('Sad')
+        if plant_image:
+            plant_image = plant_image.resize((300, 300), Image.Resampling.LANCZOS)
+            plant_photo = ImageTk.PhotoImage(plant_image)
+            plant_label.config(image=plant_photo)
+            plant_label.image = plant_photo
+    elif emotion == 'Angry':
+        plant_image = plant_images.get('Angry')
+        if plant_image:
+            plant_image = plant_image.resize((300, 300), Image.Resampling.LANCZOS)
+            plant_photo = ImageTk.PhotoImage(plant_image)
+            plant_label.config(image=plant_photo)
+            plant_label.image = plant_photo
+    elif emotion == 'Neutral':
         plant_image = plant_images.get('Neutral')
         if plant_image:
             plant_image = plant_image.resize((300, 300), Image.Resampling.LANCZOS)
