@@ -1,5 +1,11 @@
 import cv2
-from deepface import DeepFace
+try:
+    from deepface import DeepFace
+except ImportError as e:
+    print(f"Error importing DeepFace: {e}")
+    print("Please ensure you have the correct versions of tensorflow and deepface installed")
+    sys.exit(1)
+
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -11,6 +17,9 @@ import os
 import random
 import time
 
+# Define assets path
+ASSETS_PATH = os.path.join(os.path.dirname(__file__), "assets")
+
 # Initialize Pygame
 pygame.init()
 
@@ -20,13 +29,19 @@ screen_height = 600
 screen = pygame.display.set_mode((screen_width, screen_height))
 pygame.display.set_caption("Moody Plant")
 
-# Load images
-pot_img = pygame.image.load(os.path.join("pot.png"))
-stem_img = pygame.image.load(os.path.join("stem.png"))
-leaves_img = pygame.image.load(os.path.join("leaves.png"))
-flower_img = pygame.image.load(os.path.join("flower.png"))
-petal_img = pygame.image.load(os.path.join("petal.png"))  # Add a petal image
-background_img = pygame.image.load(os.path.join("background.png"))
+# Load images with proper path handling
+try:
+    pot_img = pygame.image.load(os.path.join(ASSETS_PATH, "pot.png"))
+    stem_img = pygame.image.load(os.path.join(ASSETS_PATH, "stem.png"))
+    leaves_img = pygame.image.load(os.path.join(ASSETS_PATH, "leaves.png"))
+    flower_img = pygame.image.load(os.path.join(ASSETS_PATH, "flower.png"))
+    petal_img = pygame.image.load(os.path.join(ASSETS_PATH, "petal.png"))
+    background_img = pygame.image.load(os.path.join(ASSETS_PATH, "background.png"))
+except FileNotFoundError as e:
+    print(f"Error loading images: {e}")
+    print("Please ensure all required images are in the assets folder:")
+    print("- pot.png\n- stem.png\n- leaves.png\n- flower.png\n- petal.png\n- background.png")
+    sys.exit(1)
 
 # Resize images (if needed)
 pot_img = pygame.transform.scale(pot_img, (100, 100))
@@ -45,25 +60,35 @@ blooming_flowers = []
 
 # Function to detect emotion
 def detect_emotion():
-    cap = cv2.VideoCapture(0)
-    if not cap.isOpened():
-        print("Error: Could not open webcam.")
-        return None
-
-    ret, frame = cap.read()
-    if not ret:
-        print("Error: Could not read frame.")
-        return None
-
-    cv2.imwrite("temp.jpg", frame)
     try:
-        result = DeepFace.analyze("temp.jpg", actions=["emotion"])
-        emotion = result[0]["dominant_emotion"]
-        print(f"Detected emotion: {emotion}")
-        return emotion
+        cap = cv2.VideoCapture(0)
+        if not cap.isOpened():
+            print("Error: Could not open webcam.")
+            return "neutral"  # Default emotion if webcam fails
+
+        ret, frame = cap.read()
+        if not ret:
+            print("Error: Could not read frame.")
+            return "neutral"
+
+        cv2.imwrite("temp.jpg", frame)
+        try:
+            result = DeepFace.analyze("temp.jpg", actions=["emotion"], enforce_detection=False)
+            emotion = result[0]["dominant_emotion"]
+            print(f"Detected emotion: {emotion}")
+            return emotion
+        except Exception as e:
+            print(f"Error analyzing emotion: {e}")
+            return "neutral"
+        finally:
+            if os.path.exists("temp.jpg"):
+                try:
+                    os.remove("temp.jpg")
+                except:
+                    pass
     except Exception as e:
-        print(f"Error analyzing emotion: {e}")
-        return None
+        print(f"Unexpected error in detect_emotion: {e}")
+        return "neutral"
     finally:
         cap.release()
 
