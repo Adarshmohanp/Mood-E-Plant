@@ -166,15 +166,15 @@ def animate_surprise(plant_image):
     def jump(offset):
         if not running:  # Stop animation if webcam is stopped
             return
-        # Move the plant up and down
-        plant_label.place(y=50 + offset)  # Adjust the Y position
+        # Move the plant up and down (only adjust the Y position)
+        plant_label.place(x=100, y=50 + offset)  # Explicitly set the X position
         # Schedule the next frame
         if offset > -20:  # Move up
             root.after(50, jump, offset - 10)
         elif offset < 20:  # Move down
             root.after(50, jump, offset + 10)
         else:
-            plant_label.place(y=50)  # Reset position
+            plant_label.place(x=100, y=50)  # Reset position (explicitly set X and Y)
             root.after(50, expand, 1.0)
 
     def expand(scale):
@@ -283,4 +283,3 @@ root.protocol("WM_DELETE_WINDOW", on_closing)
 
 # Start the app
 root.mainloop()
-
