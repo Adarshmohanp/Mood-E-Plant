@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import styled from 'styled-components';
 import Plant from './Plant';
 import GradientBackground from './GradientBackground';
+import MusicVisualizer from './MusicVisualizer';
 
 // Type definitions
 interface DetectionResult {
@@ -23,12 +24,30 @@ const Container = styled.div`
     margin: 0 auto;
     padding: 2rem;
     z-index: 1;
+    min-height: 100vh;
 `;
 
 const StatusMessage = styled.div`
     color: #666;
     margin: 2rem 0;
     font-size: 1.2rem;
+`;
+
+const EmotionBadge = styled(motion.div)<{ emotion: string }>`
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    padding: 10px 20px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(5px);
+    color: white;
+    font-weight: bold;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+`;
+
+const PlantContainer = styled(motion.div)`
+    margin-top: 4rem;
 `;
 
 const EmotionText = styled(motion.h2)`
@@ -76,17 +95,45 @@ const EmotionDetector: React.FC = () => {
         <>
             <GradientBackground emotion={plantData?.emotion || 'neutral'} />
             <Container>
-                <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
+                <AnimatePresence>
+                    <EmotionBadge
+                        emotion={plantData.emotion}
+                        initial={{ x: 100, opacity: 0 }}
+                        animate={{ x: 0, opacity: 1 }}
+                        exit={{ x: -100, opacity: 0 }}
+                        key={plantData.emotion}
+                    >
+                        {plantData.emotion}
+                    </EmotionBadge>
+                </AnimatePresence>
+                
+                <PlantContainer
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
                     transition={{ duration: 0.5 }}
                 >
-                    <EmotionText>Current Emotion: {plantData?.emotion}</EmotionText>
-                    {plantData?.plant_image && (
-                        <Plant plantImage={plantData.plant_image} />
-                    )}
-                </motion.div>
+                    <EmotionText
+                        initial={{ y: -20, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        transition={{ delay: 0.2 }}
+                    >
+                        Current Mood
+                    </EmotionText>
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 0.5 }}
+                    >
+                        {plantData?.plant_image && (
+                            <Plant 
+                                plantImage={plantData.plant_image} 
+                                emotion={plantData.emotion} 
+                            />
+                        )}
+                    </motion.div>
+                </PlantContainer>
             </Container>
+            <MusicVisualizer emotion={plantData.emotion} />
         </>
     );
 };

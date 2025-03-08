@@ -104,7 +104,7 @@ except Exception as e:
 emotion_labels = ['Angry', 'Happy', 'Neutral', 'Sad']
 
 def preprocess_face(face_img):
-    """Enhanced preprocessing for improved emotion detection"""
+    """Enhanced preprocessing with better face normalization"""
     try:
         # Ensure grayscale
         if len(face_img.shape) > 2:
@@ -145,8 +145,63 @@ def preprocess_face(face_img):
         print(f"Error in preprocess_face: {e}")
         return None
 
+def get_emotion_prediction(face_img, confidence_threshold=0.4):
+    """Get emotion prediction with confidence threshold and ensemble"""
+    try:
+        # Get base prediction
+        base_pred = model.predict(face_img, verbose=0)[0]
+        
+        # Get predictions with slight rotations for robustness
+        predictions = [base_pred]
+        angles = [-5, 5]
+        
+        # Get image from tensor
+        img = face_img[0, :, :, 0]  # Remove batch and channel dimensions
+        
+        for angle in angles:
+            # Rotate using OpenCV instead of tensorflow/scipy
+            height, width = img.shape[:2]
+            center = (width/2, height/2)
+            rotation_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
+            rotated = cv2.warpAffine(img, rotation_matrix, (width, height))
+            
+            # Add batch and channel dimensions back
+            rotated = np.expand_dims(rotated, axis=-1)  # Add channel dimension
+            rotated = np.expand_dims(rotated, axis=0)   # Add batch dimension
+            
+            # Get prediction for rotated image
+            pred = model.predict(rotated, verbose=0)[0]
+            predictions.append(pred)
+        
+        # Average predictions
+        avg_pred = np.mean(predictions, axis=0)
+        
+        # Get top 2 predictions
+        top_2_idx = np.argsort(avg_pred)[-2:]
+        emotion_idx = top_2_idx[-1]
+        confidence = float(avg_pred[emotion_idx])
+        
+        # If confidence is too low, consider second prediction
+        if confidence < confidence_threshold:
+            second_idx = top_2_idx[-2]
+            second_confidence = float(avg_pred[second_idx])
+            if second_confidence > confidence * 0.8:
+                emotion_idx = second_idx
+                confidence = second_confidence
+        
+        return emotion_idx, confidence
+        
+    except Exception as e:
+        print(f"Error in get_emotion_prediction: {e}")
+        return None, 0.0
+
 # Initialize audio controller
-audio_controller = AudioController()
+try:
+    audio_controller = AudioController()
+    print("Audio controller initialized successfully")
+except Exception as e:
+    print(f"Error initializing audio controller: {e}")
+    audio_controller = None
 
 # Update the audio handling in get_webcam_feed function
 @app.get("/webcam-feed")
@@ -154,22 +209,17 @@ async def get_webcam_feed():
     try:
         ret, frame = cap.read()
         if not ret:
-            audio_controller.stop_music()  # Stop music if frame capture fails
             return {"error": "Failed to capture frame"}
         
-        # Process frame with improved face detection
+        # Improve face detection
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         faces = face_cascade.detectMultiScale(
             gray,
-            scaleFactor=1.05,  # More precise detection
-            minNeighbors=6,
-            minSize=(60, 60),
+            scaleFactor=1.1,
+            minNeighbors=5,
+            minSize=(48, 48),
             maxSize=(300, 300)
         )
-        
-        if len(faces) == 0:
-            audio_controller.stop_music()  # Stop music if no faces detected
-            return {"results": []}
         
         results = []
         for (x, y, w, h) in faces:
@@ -182,77 +232,56 @@ async def get_webcam_feed():
                 x2 = min(frame.shape[1], x + w + margin)
                 
                 face_roi = gray[y1:y2, x1:x2]
-                
                 if face_roi.size == 0:
                     continue
                 
-                # Preprocess face
+                # Process face
                 processed_face = preprocess_face(face_roi)
                 if processed_face is None:
                     continue
                 
-                # Get prediction with temperature scaling
-                prediction = model.predict(processed_face, verbose=0)[0]
-                temperature = 0.7  # Adjust prediction sharpness
-                prediction = np.exp(np.log(prediction) / temperature)
-                prediction = prediction / np.sum(prediction)
-                
-                # Get top 2 predictions
-                top_2_idx = np.argsort(prediction)[-2:]
-                emotion_idx = top_2_idx[-1]
-                confidence = float(prediction[emotion_idx])
-                
-                # Emotion-specific thresholds
-                thresholds = {
-                    'Happy': 0.4,
-                    'Sad': 0.4,
-                    'Angry': 0.45,
-                    'Neutral': 0.35
-                }
-                
-                emotion = emotion_labels[emotion_idx]
-                
-                # Check confidence threshold
-                if confidence < thresholds.get(emotion, 0.4):
-                    # Try second best prediction
-                    second_idx = top_2_idx[-2]
-                    second_confidence = float(prediction[second_idx])
-                    if second_confidence > confidence * 0.8:
-                        emotion_idx = second_idx
-                        emotion = emotion_labels[emotion_idx]
-                        confidence = second_confidence
-                
-                # Play corresponding music
-                audio_controller.play_emotion_music(emotion)
-                
-                # Get plant image
-                plant_image_path = os.path.join(
-                    os.path.dirname(__file__), 
-                    f'../assets/plant_images/{emotion.lower()}_plant.png'
+                # Get emotion prediction
+                emotion_idx, confidence = get_emotion_prediction(
+                    processed_face,
+                    confidence_threshold=0.4
                 )
                 
-                if os.path.exists(plant_image_path):
-                    with open(plant_image_path, 'rb') as img_file:
-                        plant_image = base64.b64encode(img_file.read()).decode('utf-8')
-                else:
+                if emotion_idx is not None:
+                    emotion = emotion_labels[emotion_idx]
+                    
+                    # Get plant image
+                    plant_image_path = os.path.join(
+                        os.path.dirname(__file__), 
+                        f'../assets/plant_images/{emotion.lower()}_plant.png'
+                    )
+                    
                     plant_image = None
-                
-                results.append({
-                    "emotion": emotion,
-                    "confidence": float(confidence),
-                    "plant_image": plant_image
-                })
+                    if os.path.exists(plant_image_path):
+                        with open(plant_image_path, 'rb') as img_file:
+                            plant_image = base64.b64encode(img_file.read()).decode('utf-8')
+                    
+                    results.append({
+                        "emotion": emotion,
+                        "confidence": confidence,
+                        "plant_image": plant_image
+                    })
+                    
+                    # Update music if confidence is high enough
+                    if confidence > 0.4:  # Lower the threshold to 0.4
+                        audio_controller.play_emotion_music(emotion)
+                        print(f"Detected emotion: {emotion} with confidence: {confidence}")
             
             except Exception as e:
                 print(f"Error processing face: {e}")
                 continue
         
-        return {
-            "results": results
-        }
+        if not results:
+            audio_controller.stop_music()
+        
+        return {"results": results}
+        
     except Exception as e:
         print(f"Error in webcam-feed: {e}")
-        audio_controller.stop_music()  # Stop music on error
         return {"error": str(e)}
 
 # Update shutdown event
