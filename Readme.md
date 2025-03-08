@@ -1,12 +1,13 @@
 # Mood-E-Plant
 
 ## Overview
-A real-time emotion detection application that displays an interactive digital plant responding to user emotions. The plant's appearance and animations change based on the detected emotional state of the user through webcam input.
+A real-time emotion detection application that displays an interactive digital plant responding to user emotions. The plant's appearance and background music change based on the detected emotional state of the user through webcam input.
 
 ## Features
 - Real-time facial emotion detection
 - Interactive plant visualization
-- Dynamic emotion-based animations
+- Emotion-based background music
+- Dynamic gradient backgrounds
 - Seamless webcam integration
 - Cross-platform compatibility
 
@@ -15,32 +16,39 @@ A real-time emotion detection application that displays an interactive digital p
 Mood-E-Plant/
 ├── backend/
 │   ├── assets/
-│   │   ├── pot.png
-│   │   ├── stem.png
-│   │   ├── leaves.png
-│   │   ├── flower.png
-│   │   ├── petal.png
-│   │   └── background.png
-│   ├── requirements.txt
-│   └── moody_plant.py
+│   │   ├── audio/
+│   │   │   ├── happy_background.mp3
+│   │   │   ├── sad_background.mp3
+│   │   │   ├── angry_background.mp3
+│   │   │   └── neutral_background.mp3
+│   │   ├── models/
+│   │   │   └── facemodel.keras
+│   │   └── plant_images/
+│   │       ├── happy_plant.png
+│   │       ├── sad_plant.png
+│   │       ├── angry_plant.png
+│   │       └── neutral_plant.png
+│   ├── src/
+│   │   ├── audio_controller.py
+│   │   ├── create_model.py
+│   │   ├── convert_model.py
+│   │   └── webcam_detector.py
+│   └── requirements.txt
 └── frontend/
     └── digital-plant-react/
         ├── public/
-        │   └── index.html
         └── src/
             ├── components/
-            │   ├── EmotionDisplay.tsx
+            │   ├── EmotionDetector.tsx
             │   ├── Plant.tsx
-            │   └── WebcamFeed.tsx
-            ├── services/
-            │   └── emotionService.ts
+            │   └── GradientBackground.tsx
             └── App.tsx
 ```
 
 ## Prerequisites
-- Python 3.8+
-- Node.js 14+
-- npm 6+
+- Python 3.11+
+- Node.js 18+
+- npm 9+
 - Webcam access
 - Windows/Linux/MacOS
 
@@ -51,7 +59,6 @@ Mood-E-Plant/
 cd backend
 python -m venv venv
 .\venv\Scripts\activate  # On Windows
-source venv/bin/activate # On Linux/MacOS
 pip install -r requirements.txt
 ```
 
@@ -67,7 +74,7 @@ npm install
 ```bash
 cd backend
 .\venv\Scripts\activate  # On Windows
-python moody_plant.py
+python src/webcam_detector.py
 ```
 
 2. Start the frontend development server:
@@ -82,64 +89,66 @@ Access the application at:
 
 ## Technology Stack
 ### Backend
-- Python 3.8+
+- Python 3.11
+- TensorFlow (Deep Learning)
 - OpenCV (Computer Vision)
-- DeepFace (Emotion Detection)
 - FastAPI (API Framework)
-- Pygame (Graphics)
+- Pygame (Audio)
 
 ### Frontend
-- React 18
-- TypeScript
+- React with TypeScript
+- Styled Components
 - Framer Motion (Animations)
-- Axios (HTTP Client)
+- Gradient Animations
 
 ## Emotion Detection Features
-The application detects and responds to the following emotions:
-- Happy: Plant blooms and glows
-- Sad: Plant droops slightly
-- Angry: Plant shakes gently
-- Neutral: Plant maintains steady state
-- Surprised: Plant displays rapid movement
-- Fear: Plant shows protective posture
-- Disgust: Plant exhibits recoiling animation
+The application detects and responds to four primary emotions:
+- Happy: Golden gradient background with upbeat music
+- Sad: Blue gradient background with melancholic music
+- Angry: Red gradient background with intense music
+- Neutral: Green gradient background with calm music
 
 ## API Endpoints
-- `GET /emotion`: Returns current emotion and plant state
-- `GET /health`: API health check
+- `GET /webcam-feed`: Returns detected emotion and plant image
+- `GET /shutdown`: Gracefully shuts down the application
 
-## Contributing
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+## Model Architecture
+- Input: 48x48 grayscale images
+- Convolutional Neural Network with:
+  - 3 Convolutional blocks
+  - Batch normalization
+  - MaxPooling layers
+  - Dropout for regularization
+- Output: 4 emotion classes
 
-## Development
-### Backend Development
-```bash
-cd backend
-python -m pytest tests/
+## Requirements
 ```
-
-### Frontend Development
-```bash
-cd frontend/digital-plant-react
-npm test
-npm run lint
+numpy==1.24.3
+tensorflow==2.13.0
+opencv-python==4.8.1.78
+fastapi==0.103.2
+pygame==2.5.2
 ```
 
 ## Troubleshooting
 Common issues and solutions:
 1. Webcam access denied: Enable camera permissions
-2. Backend connection failed: Ensure Python server is running
-3. Frontend not updating: Check browser console for errors
+2. Audio not playing: Check audio device settings
+3. Model detection issues: Ensure proper lighting and face positioning
+4. Backend errors: Check console for specific error messages
+
+## Known Limitations
+- Works best in good lighting conditions
+- Requires direct face visibility
+- Limited to four basic emotions
+- Single face detection at a time
+
+## Future Improvements
+- Multi-face detection support
+- More emotion categories
+- Improved model accuracy
+- Additional plant animations
+- Custom audio upload feature
 
 ## License
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Acknowledgments
-- OpenCV team for computer vision capabilities
-- DeepFace for emotion detection
-- React team for the frontend framework
-- All contributors who have helped shape this project
+This project is licensed under the MIT License

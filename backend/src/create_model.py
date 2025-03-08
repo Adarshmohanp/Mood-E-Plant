@@ -3,36 +3,53 @@ import os
 
 def create_emotion_model():
     model = tf.keras.Sequential([
-        # First Convolution Block
-        tf.keras.layers.Conv2D(32, (3, 3), padding='same', input_shape=(48, 48, 1)),
+        # First Convolution Block with more filters
+        tf.keras.layers.Conv2D(64, (3, 3), padding='same', input_shape=(48, 48, 1)),
         tf.keras.layers.BatchNormalization(),
         tf.keras.layers.Activation('relu'),
-        tf.keras.layers.MaxPooling2D(pool_size=(2, 2)),
-        
-        # Second Convolution Block
         tf.keras.layers.Conv2D(64, (3, 3), padding='same'),
         tf.keras.layers.BatchNormalization(),
         tf.keras.layers.Activation('relu'),
         tf.keras.layers.MaxPooling2D(pool_size=(2, 2)),
+        tf.keras.layers.Dropout(0.25),
         
-        # Third Convolution Block
+        # Second Convolution Block
+        tf.keras.layers.Conv2D(128, (3, 3), padding='same'),
+        tf.keras.layers.BatchNormalization(),
+        tf.keras.layers.Activation('relu'),
         tf.keras.layers.Conv2D(128, (3, 3), padding='same'),
         tf.keras.layers.BatchNormalization(),
         tf.keras.layers.Activation('relu'),
         tf.keras.layers.MaxPooling2D(pool_size=(2, 2)),
+        tf.keras.layers.Dropout(0.25),
         
-        # Fourth Convolution Block
+        # Third Convolution Block
+        tf.keras.layers.Conv2D(256, (3, 3), padding='same'),
+        tf.keras.layers.BatchNormalization(),
+        tf.keras.layers.Activation('relu'),
         tf.keras.layers.Conv2D(256, (3, 3), padding='same'),
         tf.keras.layers.BatchNormalization(),
         tf.keras.layers.Activation('relu'),
         tf.keras.layers.MaxPooling2D(pool_size=(2, 2)),
+        tf.keras.layers.Dropout(0.25),
         
-        # Dense Layers
+        # Flatten and Dense Layers
         tf.keras.layers.Flatten(),
         tf.keras.layers.Dense(512, activation='relu'),
+        tf.keras.layers.BatchNormalization(),
+        tf.keras.layers.Dropout(0.5),
+        tf.keras.layers.Dense(256, activation='relu'),
+        tf.keras.layers.BatchNormalization(),
         tf.keras.layers.Dropout(0.5),
         tf.keras.layers.Dense(4, activation='softmax')  # 4 emotions
     ])
+    
+    # Compile with a lower learning rate
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=0.0005),
+        loss='categorical_crossentropy',
+        metrics=['accuracy']
+    )
     
     return model
 

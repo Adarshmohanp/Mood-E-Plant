@@ -104,15 +104,30 @@ except Exception as e:
 emotion_labels = ['Angry', 'Happy', 'Neutral', 'Sad']
 
 def preprocess_face(face_img):
-    """Enhanced preprocessing for accurate emotion detection"""
+    """Enhanced preprocessing for improved emotion detection"""
     try:
         # Ensure grayscale
         if len(face_img.shape) > 2:
             face_img = cv2.cvtColor(face_img, cv2.COLOR_BGR2GRAY)
         
+        # Add padding to ensure face features are captured
+        h, w = face_img.shape
+        padding = int(max(h, w) * 0.2)
+        face_img = cv2.copyMakeBorder(
+            face_img, 
+            padding, padding, padding, padding,
+            cv2.BORDER_REPLICATE
+        )
+        
+        # Apply histogram equalization
+        face_img = cv2.equalizeHist(face_img)
+        
         # Apply CLAHE for better contrast
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
         face_img = clahe.apply(face_img)
+        
+        # Gaussian blur to reduce noise
+        face_img = cv2.GaussianBlur(face_img, (3, 3), 0)
         
         # Resize to model input size
         face_img = cv2.resize(face_img, (48, 48))
@@ -133,35 +148,40 @@ def preprocess_face(face_img):
 # Initialize audio controller
 audio_controller = AudioController()
 
-# Update the get_webcam_feed function
+# Update the audio handling in get_webcam_feed function
 @app.get("/webcam-feed")
 async def get_webcam_feed():
     try:
         ret, frame = cap.read()
         if not ret:
+            audio_controller.stop_music()  # Stop music if frame capture fails
             return {"error": "Failed to capture frame"}
         
-        # Process frame
+        # Process frame with improved face detection
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         faces = face_cascade.detectMultiScale(
             gray,
-            scaleFactor=1.1,
-            minNeighbors=5,
-            minSize=(48, 48),
-            flags=cv2.CASCADE_SCALE_IMAGE
+            scaleFactor=1.05,  # More precise detection
+            minNeighbors=6,
+            minSize=(60, 60),
+            maxSize=(300, 300)
         )
+        
+        if len(faces) == 0:
+            audio_controller.stop_music()  # Stop music if no faces detected
+            return {"results": []}
         
         results = []
         for (x, y, w, h) in faces:
             try:
-                # Ensure coordinates are within frame bounds
-                x = max(0, min(x, frame.shape[1] - 1))
-                y = max(0, min(y, frame.shape[0] - 1))
-                w = min(w, frame.shape[1] - x)
-                h = min(h, frame.shape[0] - y)
+                # Extract face with margin
+                margin = int(max(w, h) * 0.2)
+                y1 = max(0, y - margin)
+                y2 = min(frame.shape[0], y + h + margin)
+                x1 = max(0, x - margin)
+                x2 = min(frame.shape[1], x + w + margin)
                 
-                # Extract face region
-                face_roi = gray[y:y+h, x:x+w]
+                face_roi = gray[y1:y2, x1:x2]
                 
                 if face_roi.size == 0:
                     continue
@@ -171,13 +191,38 @@ async def get_webcam_feed():
                 if processed_face is None:
                     continue
                 
-                # Get prediction
+                # Get prediction with temperature scaling
                 prediction = model.predict(processed_face, verbose=0)[0]
-                emotion_idx = np.argmax(prediction)
-                emotion = emotion_labels[emotion_idx]
+                temperature = 0.7  # Adjust prediction sharpness
+                prediction = np.exp(np.log(prediction) / temperature)
+                prediction = prediction / np.sum(prediction)
+                
+                # Get top 2 predictions
+                top_2_idx = np.argsort(prediction)[-2:]
+                emotion_idx = top_2_idx[-1]
                 confidence = float(prediction[emotion_idx])
                 
-                # Update background music based on emotion
+                # Emotion-specific thresholds
+                thresholds = {
+                    'Happy': 0.4,
+                    'Sad': 0.4,
+                    'Angry': 0.45,
+                    'Neutral': 0.35
+                }
+                
+                emotion = emotion_labels[emotion_idx]
+                
+                # Check confidence threshold
+                if confidence < thresholds.get(emotion, 0.4):
+                    # Try second best prediction
+                    second_idx = top_2_idx[-2]
+                    second_confidence = float(prediction[second_idx])
+                    if second_confidence > confidence * 0.8:
+                        emotion_idx = second_idx
+                        emotion = emotion_labels[emotion_idx]
+                        confidence = second_confidence
+                
+                # Play corresponding music
                 audio_controller.play_emotion_music(emotion)
                 
                 # Get plant image
@@ -202,24 +247,24 @@ async def get_webcam_feed():
                 print(f"Error processing face: {e}")
                 continue
         
-        # If no faces detected, stop music
-        if len(results) == 0:
-            audio_controller.stop_music()
-        
         return {
             "results": results
         }
     except Exception as e:
         print(f"Error in webcam-feed: {e}")
+        audio_controller.stop_music()  # Stop music on error
         return {"error": str(e)}
 
 # Update shutdown event
 @app.on_event("shutdown")
 def shutdown_event():
-    if cap is not None:
-        cap.release()
-    audio_controller.stop_music()
-    pygame.mixer.quit()
+    try:
+        if cap is not None:
+            cap.release()
+        audio_controller.stop_music()
+        pygame.mixer.quit()
+    except Exception as e:
+        print(f"Error during shutdown: {e}")
 
 if __name__ == "__main__":
     import uvicorn
@@ -227,5 +272,4 @@ if __name__ == "__main__":
         uvicorn.run(app, host="0.0.0.0", port=8000)
     except KeyboardInterrupt:
         print("\nShutting down gracefully...")
-        if cap is not None:
-            cap.release()
+        shutdown_event()
