@@ -21,3 +21,7 @@ yarn-error.log*
 
 # Project specific
 backend/temp.jpg
+
+#image dataset
+archive/
+best_model.keras
