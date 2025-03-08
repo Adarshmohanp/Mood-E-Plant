@@ -26,7 +26,7 @@ with suppress_stdout():
 
 # Load the emotion recognition model
 model = tf.keras.models.load_model('facemodel.keras')
-emotion_labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Neutral', 'Sad', 'Surprise']
+emotion_labels = ['Angry', 'Fear', 'Happy', 'Neutral', 'Sad', 'Surprise']
 
 # Load plant images
 plant_images = {
@@ -36,6 +36,17 @@ plant_images = {
     'Angry': Image.open('angry_plant.png'),
     'Fear': Image.open('fear_plant.png'),  # Add a plant image for Fear
     'Surprise': Image.open('surprise_plant.png')  # Add a plant image for Surprise
+}
+
+# Sassy messages for each emotion
+sassy_messages = {
+    'Happy': "You’re glowing today! 🌟",
+    'Sad': "Even plants cry sometimes. 💧",
+    'Angry': "Chill out before I wilt! 🔥",
+    'Fear': "Don’t be scared, I’m here! 👻",
+    'Surprise': "Wow, you surprised me! 😲",
+    'Neutral': "Just another day in the pot. 🪴",
+    
 }
 
 # Face detection model
@@ -52,6 +63,10 @@ def update_plant(emotion):
         plant_photo = ImageTk.PhotoImage(plant_image)
         plant_label.config(image=plant_photo)
         plant_label.image = plant_photo
+
+        # Update the sassy message
+        message = sassy_messages.get(emotion, "I’m feeling something... 🤔")
+        message_label.config(text=message)
 
         # Start animation based on emotion
         if emotion == 'Happy':
@@ -249,6 +264,10 @@ root.configure(bg="#1e1e1e")
 plant_label = tk.Label(root, bg="#1e1e1e")
 plant_label.pack(pady=50)  # Add more padding for better spacing
 
+# Message display (fixed position using place)
+message_label = tk.Label(root, text="How are you feeling today? 🌱", font=("Arial", 16), fg="white", bg="#1e1e1e")
+message_label.place(x=50, y=20)  # Fixed position at the top
+
 # Buttons
 btn_frame = tk.Frame(root, bg="#1e1e1e")
 btn_frame.pack(pady=20)
@@ -264,3 +283,4 @@ root.protocol("WM_DELETE_WINDOW", on_closing)
 
 # Start the app
 root.mainloop()
+
