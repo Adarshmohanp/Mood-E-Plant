@@ -26,7 +26,7 @@ with suppress_stdout():
 
 # Load the emotion recognition model
 model = tf.keras.models.load_model('facemodel.keras')
-emotion_labels = ['Angry', 'Fear', 'Happy', 'Neutral', 'Sad', 'Surprise']
+emotion_labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Neutral', 'Sad', 'Surprise']
 
 # Load plant images
 plant_images = {
